@@ -30,7 +30,7 @@ namespace
     bool _requireSameMapAndZone = true;
 
     // XP multipliers ordered by party size
-    std::array<float, PARTY_SIZE_MAX - PARTY_SIZE_MIN + 1> _xpMultipliers = { 1.20f, 1.40f, 1.60f, 1.80f };
+    std::array<float, PARTY_SIZE_MAX - PARTY_SIZE_MIN + 1> _xpMultipliers = { 1.10f, 1.20f, 1.30f, 1.40f };
 
     bool _OWPSIntegrationEnabled = false;
     bool _owpsOverrideMultiplier = false;
@@ -54,8 +54,7 @@ namespace
     // Load module settings after world server options are available
     void LoadConfig()
     {
-        _moduleEnabled = sConfigMgr->GetOption<bool>("GroupXP.Enable",
-            true);
+        _moduleEnabled = sConfigMgr->GetOption<bool>("GroupXP.Enable", true);
 
         _requireSameMapAndZone = sConfigMgr->GetOption<bool>("GroupXP.RequireSameMapAndZone", true);
 
@@ -64,7 +63,7 @@ namespace
         const bool isOWPSenabled = sConfigMgr->GetOption<bool>("OpenWorldPartyScaling.Enable", false);
 
         // The OWPS integration can only be enabled if OWPS is enabled. There doesn't seem to be any definitions we can use, so let's just piggyback ride the config
-        _OWPSIntegrationEnabled = isOWPSenabled && sConfigMgr->GetOption<bool>("GroupXP.OWPS.EnableIntegration", false);
+        _OWPSIntegrationEnabled = isOWPSenabled && sConfigMgr->GetOption<bool>("GroupXP.OWPS.EnableIntegration", true);
 
         // If using open world party scaling config, load the corresponding config settings
         if (_OWPSIntegrationEnabled)
@@ -73,9 +72,9 @@ namespace
             _owpsOverrideMultiplier = sConfigMgr->GetOption<bool>("GroupXP.OWPS.OverrideMultiplier", false);
 
             // How much the OWPS multiplier affects the given XP
-            _owpsDamageWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.DamageMultiplier", 1.0f);
-            _owpsHealingWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.HealingMultiplier", 1.0f);
-            _owpsIncomingDamageWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.IncomingDamageMultiplier", 0.5f);
+            _owpsDamageWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.DamageMultiplier", 0.8f);
+            _owpsHealingWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.HealingMultiplier", 0.4f);
+            _owpsIncomingDamageWeight = sConfigMgr->GetOption<float>("GroupXP.OWPS.IncomingDamageMultiplier", 0.8f);
         }
 #pragma endregion
 
@@ -83,7 +82,7 @@ namespace
         for (uint32 partySize = PARTY_SIZE_MIN; partySize <= PARTY_SIZE_MAX; ++partySize)
         {
             std::string const key = "GroupXP.PartySize" + std::to_string(partySize) + ".XPMultiplier";
-            const float defaultValue = 1.0f + (static_cast<float>(partySize - 1) * 0.20f);
+            const float defaultValue = 1.0f + (static_cast<float>(partySize - 1) * 0.10f);
             float baseMultiplier = LoadXPMultiplierConfig(key, defaultValue);
 
 
@@ -97,16 +96,16 @@ namespace
 
                 // Load OWPS multipliers for this party size
                 std::string const prefix = "OpenWorldPartyScaling.PartySize" + std::to_string(partySize);
-                float owpsDamage = sConfigMgr->GetOption<float>(prefix + ".DamageMultiplier", 1.0f);
-                float owpsHealing = sConfigMgr->GetOption<float>(prefix + ".HealingMultiplier", 1.0f);
-                float owpsIncomingDamage = sConfigMgr->GetOption<float>(prefix + ".IncomingDamageMultiplier", 1.0f);
+                const float owpsDamage = sConfigMgr->GetOption<float>(prefix + ".DamageMultiplier", 1.0f);
+                const float owpsHealing = sConfigMgr->GetOption<float>(prefix + ".HealingMultiplier", 1.0f);
+                const float owpsIncomingDamage = sConfigMgr->GetOption<float>(prefix + ".IncomingDamageMultiplier", 1.0f);
 
                 // Damage and healing are reductions: lower value = more difficulty = more XP
-                float damageContribution = (1.0f - owpsDamage) * _owpsDamageWeight;
-                float healingContribution = (1.0f - owpsHealing) * _owpsHealingWeight;
+                const float damageContribution = (1.0f - owpsDamage) * _owpsDamageWeight;
+                const float healingContribution = (1.0f - owpsHealing) * _owpsHealingWeight;
 
                 // Incoming damage is an increase: higher value = more difficulty = more XP
-                float incomingDamageContribution = (owpsIncomingDamage - 1.0f) * _owpsIncomingDamageWeight;
+                const float incomingDamageContribution = (owpsIncomingDamage - 1.0f) * _owpsIncomingDamageWeight;
 
                 // Apply all contributions to the base multiplier
                 baseMultiplier += damageContribution + healingContribution + incomingDamageContribution;
