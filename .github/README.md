@@ -1,25 +1,83 @@
-# SKELETON - Module template
+# ![logo](https://raw.githubusercontent.com/azerothcore/azerothcore.github.io/master/images/logo-github.png) AzerothCore
+## mod-group-xp
+### This is a module for [AzerothCore](http://www.azerothcore.org)
 
-[English](README.md) | [Español](README_ES.md)
+# Module info
+
+- Name: Group XP Rebalancer
+- Author: ChainedOrbiter
+- Module:
+    + Repository: [https://github.com/ChainedOrbiter/mod-group-xp](https://github.com/ChainedOrbiter/mod-group-xp)
+- License: MIT License
+
+# Module integration
+
+- Includes configuration (.conf)?: Yes, copied by CMake
+- Includes SQL patches?: No
+- Core hooks used:
+    + PlayerScript: OnLogin
+    + PlayerScript: OnGiveXP
+    + WorldScript: OnAfterConfigLoad
+
+# Description
+This module rebalances the amount of kill XP granted when in a party, primarily when in an open world setting (i.e. not in a dungeon or raid).
+
+#### Features:
+- Command handler for info & debugging: ``.groupxp``
+- Designed for open-world leveling
+- (Optional) Integrates with mod-open-world-party-scaling ([https://github.com/Stefan2102/mod-open-world-party-scaling](https://github.com/Stefan2102/mod-open-world-party-scaling)) to use as basis for multipliers. This allows harder fights to also give greater rewards, or vice versa.
+
+### How to install
+1. Simply place the module under the `modules` folder of your AzerothCore source folder.
+2. Re-run cmake and build AzerothCore
+3. that's all
+
+## Configuration
+The module uses direct decimal multipliers for party sizes 2, 3, 4, and 5. Raid groups are excluded.
+
+```ini
+GroupXP.Enable = 1
+GroupXP.RequireSameMapAndZone = 1
+
+# Party sizes
+GroupXP.PartySize2.XPMultiplier = 1.10
+GroupXP.PartySize3.XPMultiplier = 1.20
+GroupXP.PartySize4.XPMultiplier = 1.30
+GroupXP.PartySize5.XPMultiplier = 1.40
+```
+
+For example, with the settings above a party of 3 memebrs would receive 120% of regular XP. I.e. if a kill in the party would regularly award 100 XP it would instead give 130 XP.
+
+### Open World Party Scaling integration
+These settings allow the XP multipliers to be dynamically adjusted based on the difficulty modifiers from the mod-open-world-party-scaling module.
+
+This integration is only active when:
+1. GroupXP.OWPS.EnableIntegration = 1
+2. The mod-open-world-party-scaling module is compiled and loaded
+
+```ini
+GroupXP.OWPS.EnableIntegration        = 1
+GroupXP.OWPS.OverrideMultiplier       = 0
+GroupXP.OWPS.DamageMultiplier         = 0.80
+GroupXP.OWPS.HealingMultiplier        = 0.40
+GroupXP.OWPS.IncomingDamageMultiplier = 0.80
+```
+
+How the calculation works:
+- The base XP multiplier starts from GroupXP.PartySizeN.XPMultiplier
+- OWPS modifiers contribute additively based on their difference from 1.0 (100%)
+- Each contribution is weighted by the corresponding OWPS.*Multiplier setting
+
+The OWPS multipliers are how heavily weighted the party scaling values are when taken into account for XP multipliers.
+
+It's recommended to use the ``.groupxp`` command when balancing. The commands are quite  verbose when OWPS integration is enabled to give the full picture.
+
+More details and examples can be found in the ``.conf`` file.
+
+### Reloading config
+The module is engineered to respect the ``.reload config``, so any value changes made in the ``.conf`` file will be updated directly. This can be verified with the chat commands.
 
 
-## How to create your own module
-
-1. Use the script `create_module.sh` located in [`modules/`](https://github.com/azerothcore/azerothcore-wotlk/tree/master/modules) to start quickly with all the files you need and your git repo configured correctly (heavily recommended).
-1. You can then use these scripts to start your project: https://github.com/azerothcore/azerothcore-boilerplates
-1. Do not hesitate to compare with some of our newer/bigger/famous modules.
-1. Edit the `README.md` and other files (`include.sh` etc...) to fit your module. Note: the README is automatically created from `README_example.md` when you use the script `create_module.sh`.
-1. Publish your module to our [catalogue](https://www.azerothcore.org/catalogue.html).
-
-
-## How to test your module?
-
-Disable PCH (precompiled headers) and try to compile. To disable PCH, set `-DNOPCH=1` with Cmake (more info [here](http://www.azerothcore.org/wiki/CMake-options)).
-
-If you forgot some headers, it is time to add them!
-
-## Licensing
-
-The default license of the skeleton-module template is the MIT but you can use a different license for your own modules.
-
-So modules can also be kept private. However, if you need to add new hooks to the core, as well as improving existing ones, you have to share your improvements because the main core is released under the AGPL license. Please [provide a PR](https://www.azerothcore.org/wiki/How-to-create-a-PR) if that is the case.
+## Credits
+* Stefan2102 for making mod-open-world-party-scaling, inspiring this mod
+* AzerothCore: [repository](https://github.com/azerothcore) - [website](http://azerothcore.org/) - [discord chat community](https://discord.gg/PaqQRkd)
