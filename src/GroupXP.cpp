@@ -2,21 +2,18 @@
  * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
  */
 
+#include <algorithm>
+#include <array>
+#include <string>
+
+#include "Chat.h"
 #include "Config.h"
+#include "Formulas.h"
 #include "Group.h"
 #include "Map.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "ScriptMgr.h"
-#include "Chat.h"
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <limits>
-#include <string>
-
-#include "Formulas.h"
 
 using namespace Acore::ChatCommands;
 
@@ -40,6 +37,9 @@ namespace
     float _owpsDamageWeight = 1.0f;
     float _owpsHealingWeight = 1.0f;
     float _owpsIncomingDamageWeight = 0.5f;
+
+    // Storage for players who enabled debugging
+    std::map<uint64, bool> _playerDebugLoggingEnabled;
 
 
     float LoadXPMultiplierConfig(std::string const& key, float defaultValue)
@@ -118,6 +118,26 @@ namespace
         }
     }
 
+
+    bool HasPlayerDebugLoggingEnabled(uint64 guid)
+    {
+        return _playerDebugLoggingEnabled.count(guid) > 0;
+    }
+
+    bool GetPlayerDebugLoggingEnabled(uint64 guid)
+    {
+        auto it = _playerDebugLoggingEnabled.find(guid);
+        if (it != _playerDebugLoggingEnabled.end())
+            return it->second;
+        return false;
+    }
+
+    void SetPlayerDebugLoggingEnabled(uint64 guid, bool enabled)
+    {
+        _playerDebugLoggingEnabled[guid] = enabled;
+    }
+
+
     // Returns amount of eligible members when calculating XP scaling for groups.
     // Much thanks to Open World Party Scaling for the implementation
     uint32 GetEligibleMemberCount(Player* player)
@@ -176,34 +196,15 @@ namespace
         const double result = static_cast<double>(amount) * static_cast<double>(multiplier);
         const uint32 scaledValue = static_cast<uint32>(std::max(result, 0.0));
 
-        // Temporary chat logging
-        bool logging = false;
-        if (logging)
+        // Debug chat on kill
+        const uint64 playerGuid = player->GetGUID().GetRawValue();
+        if (GetPlayerDebugLoggingEnabled(playerGuid))
         {
             std::ostringstream msg;
             msg << "[Group XP] received " << scaledValue << " base XP with a x" << multiplier << " multiplier;"
                 << "would normally be " << amount << " XP.";
 
             ChatHandler(player->GetSession()).PSendSysMessage(msg.str());
-
-            // is Open World Party scaling enabled?
-            const bool isOWPSenabled = sConfigMgr->GetOption<bool>("OpenWorldPartyScaling.Enable", false);
-            const bool isIntegrationEnabled = sConfigMgr->GetOption<bool>("GroupXP.OWPS.EnableIntegration", false);
-
-            std::ostringstream msg2;
-            msg2 << "[Group XP OWPS] enabled: " << _OWPSIntegrationEnabled << " - bool isOWPSenabled: " << isOWPSenabled << " - bool isIntegrationEnabled: " << isIntegrationEnabled;
-
-            ChatHandler(player->GetSession()).PSendSysMessage(msg2.str());
-
-
-            std::ostringstream msgRates;
-            msgRates << "[Group XP] Rates: 2: " << _xpMultipliers[0]
-            << "; 3: " << _xpMultipliers[1]
-            << "; 4: " << _xpMultipliers[2]
-            << "; 5: " << _xpMultipliers[3] << ".";
-
-            ChatHandler(player->GetSession()).PSendSysMessage(msgRates.str());
-
         }
 
 
@@ -232,8 +233,19 @@ public:
 class GroupXPPlayerScript : public PlayerScript
 {
 public:
-    GroupXPPlayerScript() : PlayerScript("GroupXPPlayerScript",
-        {PLAYERHOOK_ON_GIVE_EXP}) { }
+    GroupXPPlayerScript() : PlayerScript("GroupXPPlayerScript",{
+        PLAYERHOOK_ON_GIVE_EXP,
+        PLAYERHOOK_ON_LOGIN
+    }) { }
+
+    void OnPlayerLogin(Player* player) override
+    {
+        if (_moduleEnabled)
+        {
+            // Announce GROUP XP
+            ChatHandler(player->GetSession()).SendSysMessage("This server is running the |cff4CFF00Group XP|r module.");
+        }
+    }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
@@ -269,7 +281,10 @@ public:
             { "status", HandleGroupXPStatusCommand, SEC_ADMINISTRATOR, Console::No },
             { "multipliers", HandleGroupXPMultipliersCommand, SEC_ADMINISTRATOR, Console::No },
             { "owps", HandleGroupXPOWPSCommand, SEC_ADMINISTRATOR, Console::No },
-            { "all", HandleGroupXPAllCommand, SEC_ADMINISTRATOR, Console::No }
+            { "all", HandleGroupXPAllCommand, SEC_ADMINISTRATOR, Console::No },
+
+            { "debug on", HandleGroupXPDebugOnCommand, SEC_PLAYER, Console::No },
+            { "debug off", HandleGroupXPDebugOffCommand, SEC_PLAYER, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -375,6 +390,45 @@ public:
         HandleGroupXPStatusCommand(handler, Optional<std::string>());
         HandleGroupXPMultipliersCommand(handler, Optional<std::string>());
         HandleGroupXPOWPSCommand(handler, Optional<std::string>());
+        return true;
+    }
+
+    // Debug commands
+    static bool HandleGroupXPDebugOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+            return true;
+
+        uint64 playerGuid = player->GetGUID().GetRawValue();
+
+        if (HasPlayerDebugLoggingEnabled(playerGuid) && GetPlayerDebugLoggingEnabled(playerGuid))
+        {
+            handler->PSendSysMessage("Group XP debug logging is already enabled for you.");
+            return true;
+        }
+
+        SetPlayerDebugLoggingEnabled(playerGuid, true);
+        handler->PSendSysMessage("Group XP debug logging enabled. You will now see XP calculations in chat.");
+        return true;
+    }
+
+    static bool HandleGroupXPDebugOffCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+            return true;
+
+        uint64 playerGuid = player->GetGUID().GetRawValue();
+
+        if (!HasPlayerDebugLoggingEnabled(playerGuid) || !GetPlayerDebugLoggingEnabled(playerGuid))
+        {
+            handler->PSendSysMessage("Group XP debug logging is already disabled for you.");
+            return true;
+        }
+
+        SetPlayerDebugLoggingEnabled(playerGuid, false);
+        handler->PSendSysMessage("Group XP debug logging disabled.");
         return true;
     }
 };
