@@ -177,7 +177,7 @@ namespace
         const uint32 scaledValue = static_cast<uint32>(std::max(result, 0.0));
 
         // Temporary chat logging
-        bool logging = true;
+        bool logging = false;
         if (logging)
         {
             std::ostringstream msg;
