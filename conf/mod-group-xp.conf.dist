@@ -1,0 +1,118 @@
+[worldserver]
+
+########################################
+# Group XP Rebalancer
+########################################
+# This module rebalances the amount of kill XP granted when in a party,
+# primarily when in an open world setting (i.e. not in a dungeon or raid).
+
+#    GroupXP.Enable
+#        Description: Enable the module
+#        Default:     0 - Disabled
+#                     1 - Enabled
+#
+#    GroupXP.RequireSameMapAndZone
+#        Description: Only count online party members sharing the same map and zone
+#                     When UsePartyScalingConfig = 1, this setting is overridden by
+#                     OpenWorldPartyScaling.RequireSameMapAndZone if that module is active
+#        Default:     1 - Require same map and zone
+#                     0 - Count all online members regardless of location
+#
+# XP Multiplier rules
+# All values use decimal notation, not percentage numbers.
+# For example, 1.50 means 150% of normal XP.
+# Minimum 0.10, maximum 10.00. Values outside range are clamped.
+
+GroupXP.Enable = 1
+GroupXP.RequireSameMapAndZone = 1
+
+# Party sizes
+GroupXP.PartySize2.XPMultiplier = 1.10
+GroupXP.PartySize3.XPMultiplier = 1.20
+GroupXP.PartySize4.XPMultiplier = 1.30
+GroupXP.PartySize5.XPMultiplier = 1.40
+
+
+##############################################
+# Open World Party Scaling Integration (OWPS)
+##############################################
+GroupXP.OWPS.EnableIntegration        = 1
+GroupXP.OWPS.OverrideMultiplier       = 0
+GroupXP.OWPS.DamageMultiplier         = 0.80
+GroupXP.OWPS.HealingMultiplier        = 0.40
+GroupXP.OWPS.IncomingDamageMultiplier = 0.80
+
+# These settings allow the XP multipliers to be dynamically adjusted based on the
+# difficulty modifiers from the mod-open-world-party-scaling module.
+#
+# This integration is only active when:
+# 1. GroupXP.OWPS.EnableIntegration = 1
+# 2. The mod-open-world-party-scaling module is compiled and loaded
+#
+# How the calculation works:
+# - The base XP multiplier starts from GroupXP.PartySizeN.XPMultiplier
+# - OWPS modifiers contribute additively based on their difference from 1.0 (100%)
+# - Each contribution is weighted by the corresponding OWPS.*Multiplier setting
+#
+# Damage and Healing contributions:
+#   OWPS reduces damage/healing output (e.g., 0.60 = 60% of normal)
+#   Lower output = more difficulty = more XP
+#   Contribution = (1.0 - OWPS_value) * OWPS_weight
+#   Example: OWPS.DamageMultiplier = 0.60, OWPS.DamageWeight = 1.00
+#            Contribution = (1.0 - 0.60) * 1.00 = 0.40
+#
+# Incoming Damage contribution:
+#   OWPS increases incoming damage (e.g., 1.40 = 140% of normal)
+#   Higher incoming damage = more difficulty = more XP
+#   Contribution = (OWPS_value - 1.0) * OWPS_weight
+#   Example: OWPS.IncomingDamageMultiplier = 1.40, OWPS.IncomingDamageWeight = 0.50
+#            Contribution = (1.40 - 1.0) * 0.50 = 0.20
+#
+# Final XP Multiplier calculation:
+#   If OverrideMultiplier = 0:
+#     Final = Base_XP_Multiplier + Damage_Contribution + Healing_Contribution + IncomingDamage_Contribution
+#   If OverrideMultiplier = 1:
+#     Final = 1.0 + Damage_Contribution + Healing_Contribution + IncomingDamage_Contribution
+#
+# Example calculation (5-man party, OverrideMultiplier = 0):
+#   Base: GroupXP.PartySize5.XPMultiplier = 1.20
+#   OWPS.DamageMultiplier = 0.60, OWPS.DamageWeight = 1.00 → +0.40
+#   OWPS.HealingMultiplier = 0.40, OWPS.HealingWeight = 0.50 → +0.30
+#   OWPS.IncomingDamageMultiplier = 1.40, OWPS.IncomingDamageWeight = 0.00 → +0.00
+#   Final: 1.20 + 0.40 + 0.30 + 0.00 = 1.90 (190% XP)
+#
+# Example calculation (5-man party, OverrideMultiplier = 1):
+#   Base: 1.0 (ignores GroupXP.PartySize5.XPMultiplier)
+#   OWPS.DamageMultiplier = 0.60, OWPS.DamageWeight = 1.00 → +0.40
+#   OWPS.HealingMultiplier = 0.40, OWPS.HealingWeight = 0.50 → +0.30
+#   OWPS.IncomingDamageMultiplier = 1.40, OWPS.IncomingDamageWeight = 0.00 → +0.00
+#   Final: 1.0 + 0.40 + 0.30 + 0.00 = 1.70 (170% XP)
+
+#    GroupXP.OWPS.EnableIntegration
+#        Description: Enable integration with mod-open-world-party-scaling module
+#                     When enabled, XP multipliers can be adjusted based on OWPS settings
+#        Default:     0 - Use only this module's XP multipliers
+#                     1 - Integrate with OWPS module settings
+#
+#    GroupXP.OWPS.OverrideMultiplier
+#        Description: When enabled, ignore XPMultiplier settings and calculate solely from OWPS values
+#        Default:     0 - Use base XP multipliers as starting point
+#                     1 - Start from 1.0 (100% XP)
+#
+#    GroupXP.OWPS.DamageMultiplier
+#        Description: Weight for how much OWPS damage reduction affects XP
+#        Default:     1.00 - Full contribution
+#                     0.00 - No contribution
+#                     0.50 - Half contribution
+#
+#    GroupXP.OWPS.HealingMultiplier
+#        Description: Weight for how much OWPS healing reduction affects XP
+#        Default:     1.00 - Full contribution
+#                     0.00 - No contribution
+#                     0.50 - Half contribution
+#
+#    GroupXP.OWPS.IncomingDamageMultiplier
+#        Description: Weight for how much OWPS incoming damage increase affects XP
+#        Default:     0.00 - No contribution (recommended)
+#                     1.00 - Full contribution
+#                     0.50 - Half contribution
