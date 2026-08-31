@@ -46,7 +46,7 @@ GroupXP.PartySize4.XPMultiplier = 1.30
 GroupXP.PartySize5.XPMultiplier = 1.40
 ```
 
-For example, with the settings above a party of 3 memebrs would receive 120% of regular XP. I.e. if a kill in the party would regularly award 100 XP it would instead give 130 XP.
+For example, with the settings above a party of 3 members would receive 130% of regular XP. I.e. if a kill would regularly award 100 XP it would instead give 130 XP.
 
 ### Open World Party Scaling integration
 These settings allow the XP multipliers to be dynamically adjusted based on the difficulty modifiers from the mod-open-world-party-scaling module.
